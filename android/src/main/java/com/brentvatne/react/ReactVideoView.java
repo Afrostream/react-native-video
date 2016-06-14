@@ -1,10 +1,13 @@
 package com.brentvatne.react;
 
+import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.net.Uri;
 import android.webkit.CookieManager;
 import android.support.annotation.IntRange;
+import android.content.Intent;
+import android.content.Context;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -15,6 +18,7 @@ import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
+import com.devbrackets.android.exomedia.BuildConfig;
 import com.devbrackets.android.exomedia.listener.OnBufferUpdateListener;
 import com.devbrackets.android.exomedia.listener.OnCompletionListener;
 import com.devbrackets.android.exomedia.listener.OnErrorListener;
@@ -22,9 +26,29 @@ import com.devbrackets.android.exomedia.listener.OnPreparedListener;
 import com.devbrackets.android.exomedia.ui.widget.EMVideoView;
 import com.devbrackets.android.exomedia.core.video.scale.ScaleType;
 
+import com.devbrackets.android.exomedia.core.builder.DashRenderBuilder;
+import com.devbrackets.android.exomedia.core.builder.HlsRenderBuilder;
+import com.devbrackets.android.exomedia.core.builder.RenderBuilder;
+import com.devbrackets.android.exomedia.core.builder.SmoothStreamRenderBuilder;
+import com.devbrackets.android.exomedia.type.MediaSourceType;
+import com.devbrackets.android.exomedia.util.MediaSourceUtil;
+
+import com.google.android.exoplayer.util.Util;
+
 
 public class ReactVideoView extends EMVideoView implements
         OnPreparedListener, OnErrorListener, OnBufferUpdateListener, OnCompletionListener {
+
+    protected static final String USER_AGENT_FORMAT = "EMVideoView %s / Android %s / %s";
+    // For use within demo app code.
+    public static final String CONTENT_ID_EXTRA = "content_id";
+    public static final String CONTENT_TYPE_EXTRA = "content_type";
+    public static final String PROVIDER_EXTRA = "provider";
+    // For use when launching the demo app using adb.
+    private static final String CONTENT_EXT_EXTRA = "type";
+
+    private String contentId;
+    private String provider;
 
     public enum Events
 
@@ -131,13 +155,15 @@ public class ReactVideoView extends EMVideoView implements
         mVideoDuration = 0;
         mVideoBufferedDuration = 0;
 
+        Uri parsedUrl = Uri.parse(uriString);
+        RenderBuilder builder = parsedUrl == null ? null : getRendererBuilder(MediaSourceUtil.getType(parsedUrl), parsedUrl);
+
         try {
             if (isNetwork) {
                 // Use the shared CookieManager to access the cookies
                 // set by WebViews inside the same app
                 CookieManager cookieManager = CookieManager.getInstance();
 
-                Uri parsedUrl = Uri.parse(uriString);
                 Uri.Builder builtUrl = parsedUrl.buildUpon();
 
                 String cookie = cookieManager.getCookie(builtUrl.build().toString());
@@ -148,14 +174,12 @@ public class ReactVideoView extends EMVideoView implements
                     headers.put("Cookie", cookie);
                 }
 
-                setVideoURI(parsedUrl);
+                setVideoURI(parsedUrl, builder);
             } else if (isAsset) {
                 if (uriString.startsWith("content://")) {
-                    Uri parsedUrl = Uri.parse(uriString);
-                    setVideoURI(parsedUrl);
+                    setVideoURI(parsedUrl, builder);
                 } else {
-                    Uri parsedUrl = Uri.parse(uriString);
-                    setVideoURI(parsedUrl);
+                    setVideoURI(parsedUrl, builder);
                 }
             } else {
                 throw new IllegalArgumentException("raw resource not supported by ExoPlayer");
@@ -172,6 +196,37 @@ public class ReactVideoView extends EMVideoView implements
         WritableMap event = Arguments.createMap();
         event.putMap(ReactVideoViewManager.PROP_SRC, src);
         mEventEmitter.receiveEvent(getId(), Events.EVENT_LOAD_START.toString(), event);
+    }
+
+    /**
+     * Creates and returns the correct render builder for the specified VideoType and uri.
+     *
+     * @param renderType The RenderType to use for creating the correct RenderBuilder
+     * @param uri        The video's Uri
+     * @return The appropriate RenderBuilder
+     */
+    protected RenderBuilder getRendererBuilder(MediaSourceType renderType, Uri uri) {
+        switch (renderType) {
+            case HLS:
+                return new HlsRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString());
+            case DASH:
+                return new DashDRMRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString(),
+                        new WidevineTestMediaDrmCallback("", "widevine_test"));
+            case SMOOTH_STREAM:
+                return new SmoothStreamRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString());
+            default:
+                return new RenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString());
+        }
+    }
+
+    /**
+     * Retrieves the user agent that the EMVideoView will use when communicating
+     * with media servers
+     *
+     * @return The String user agent for the EMVideoView
+     */
+    public String getUserAgent() {
+        return String.format(USER_AGENT_FORMAT, BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")", Build.VERSION.RELEASE, Build.MODEL);
     }
 
     public void setResizeModeModifier(final ScaleType resizeMode) {
