@@ -1,41 +1,44 @@
 package com.brentvatne.react;
 
-import android.media.MediaPlayer;
 import android.os.Handler;
 import android.util.Log;
 import android.net.Uri;
 import android.webkit.CookieManager;
+
 import java.util.Map;
 import java.util.HashMap;
+
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
-import com.yqritc.scalablevideoview.ScalableType;
-import com.yqritc.scalablevideoview.ScalableVideoView;
 
-public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnPreparedListener, MediaPlayer
-        .OnErrorListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnCompletionListener, LifecycleEventListener {
+import com.devbrackets.android.exomedia.core.video.ExoVideoView;
 
-    public enum Events {
+public class ReactVideoView extends ExoVideoView implements ExoVideoView.OnPreparedListener, ExoVideoView
+        .OnErrorListener, ExoVideoView.OnBufferingUpdateListener, ExoVideoView.OnCompletionListener {
+
+    public enum Events
+
+    {
         EVENT_LOAD_START("onVideoLoadStart"),
-        EVENT_LOAD("onVideoLoad"),
-        EVENT_ERROR("onVideoError"),
-        EVENT_PROGRESS("onVideoProgress"),
-        EVENT_SEEK("onVideoSeek"),
-        EVENT_END("onVideoEnd");
+                EVENT_LOAD("onVideoLoad"),
+                EVENT_ERROR("onVideoError"),
+                EVENT_PROGRESS("onVideoProgress"),
+                EVENT_SEEK("onVideoSeek"),
+                EVENT_END("onVideoEnd");
 
         private final String mName;
 
-        Events(final String name) {
-            mName = name;
-        }
+        Events( final String name){
+        mName = name;
+    }
 
         @Override
-        public String toString() {
-            return mName;
-        }
+        public String toString () {
+        return mName;
+    }
     }
 
     public static final String EVENT_PROP_FAST_FORWARD = "canPlayFastForward";
@@ -68,7 +71,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private String mSrcType = "mp4";
     private boolean mSrcIsNetwork = false;
     private boolean mSrcIsAsset = false;
-    private ScalableType mResizeMode = ScalableType.LEFT_TOP;
+    private ScaleType mResizeMode = ScaleType.CENTER_INSIDE;
     private boolean mRepeat = false;
     private boolean mPaused = false;
     private boolean mMuted = false;
@@ -76,7 +79,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private float mRate = 1.0f;
     private boolean mPlayInBackground = false;
 
-    private boolean mMediaPlayerValid = false; // True if mMediaPlayer is in prepared, started, or paused state.
+    private boolean emExoPlayerValid = false; // True if emExoPlayer is in prepared, started, or paused state.
     private int mVideoDuration = 0;
     private int mVideoBufferedDuration = 0;
 
@@ -94,9 +97,9 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
             @Override
             public void run() {
 
-                if (mMediaPlayerValid) {
+                if (emExoPlayerValid) {
                     WritableMap event = Arguments.createMap();
-                    event.putDouble(EVENT_PROP_CURRENT_TIME, mMediaPlayer.getCurrentPosition() / 1000.0);
+                    event.putDouble(EVENT_PROP_CURRENT_TIME, emExoPlayer.getCurrentPosition() / 1000.0);
                     event.putDouble(EVENT_PROP_PLAYABLE_DURATION, mVideoBufferedDuration / 1000.0); //TODO:mBufferUpdateRunnable
                     mEventEmitter.receiveEvent(getId(), Events.EVENT_PROGRESS.toString(), event);
                 }
@@ -107,15 +110,15 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     private void initializeMediaPlayerIfNeeded() {
-        if (mMediaPlayer == null) {
-            mMediaPlayerValid = false;
-            mMediaPlayer = new MediaPlayer();
-            mMediaPlayer.setScreenOnWhilePlaying(true);
-            mMediaPlayer.setOnVideoSizeChangedListener(this);
-            mMediaPlayer.setOnErrorListener(this);
-            mMediaPlayer.setOnPreparedListener(this);
-            mMediaPlayer.setOnBufferingUpdateListener(this);
-            mMediaPlayer.setOnCompletionListener(this);
+        if (emExoPlayer == null) {
+            emExoPlayerValid = false;
+            emExoPlayer = new EMExoPlayer();
+            emExoPlayer.setScreenOnWhilePlaying(true);
+            emExoPlayer.setOnVideoSizeChangedListener(this);
+            emExoPlayer.setOnErrorListener(this);
+            emExoPlayer.setOnPreparedListener(this);
+            emExoPlayer.setOnBufferingUpdateListener(this);
+            emExoPlayer.setOnCompletionListener(this);
         }
     }
 
@@ -125,12 +128,12 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         mSrcIsNetwork = isNetwork;
         mSrcIsAsset = isAsset;
 
-        mMediaPlayerValid = false;
+        emExoPlayerValid = false;
         mVideoDuration = 0;
         mVideoBufferedDuration = 0;
 
         initializeMediaPlayerIfNeeded();
-        mMediaPlayer.reset();
+        emExoPlayer.reset();
 
         try {
             if (isNetwork) {
@@ -149,20 +152,17 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
                     headers.put("Cookie", cookie);
                 }
 
-                setDataSource(mThemedReactContext, parsedUrl, headers);
+                setVideoUri(parsedUrl);
             } else if (isAsset) {
                 if (uriString.startsWith("content://")) {
                     Uri parsedUrl = Uri.parse(uriString);
-                    setDataSource(mThemedReactContext, parsedUrl);
+                    setVideoUri(parsedUrl);
                 } else {
-                    setDataSource(uriString);
+                    Uri parsedUrl = Uri.parse(uriString);
+                    setVideoUri(parsedUrl);
                 }
             } else {
-                setRawData(mThemedReactContext.getResources().getIdentifier(
-                        uriString,
-                        "raw",
-                        mThemedReactContext.getPackageName()
-                ));
+                throw new IllegalArgumentException("raw resource not supported by ExoPlayer");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -180,36 +180,36 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         prepareAsync(this);
     }
 
-    public void setResizeModeModifier(final ScalableType resizeMode) {
+    public void setResizeModeModifier(final ScaleType resizeMode) {
         mResizeMode = resizeMode;
 
-        if (mMediaPlayerValid) {
-            setScalableType(resizeMode);
+        if (emExoPlayerValid) {
+            setScaleType(resizeMode);
             invalidate();
         }
     }
 
     public void setRepeatModifier(final boolean repeat) {
         mRepeat = repeat;
-
-        if (mMediaPlayerValid) {
-            setLooping(repeat);
-        }
+        // TODO: no looping support from ExoPlayer yet, so do it manually at complete event
+        //if (emExoPlayerValid) {
+        //    setLooping(repeat);
+        //}
     }
 
     public void setPausedModifier(final boolean paused) {
         mPaused = paused;
 
-        if (!mMediaPlayerValid) {
+        if (!emExoPlayerValid) {
             return;
         }
 
         if (mPaused) {
-            if (mMediaPlayer.isPlaying()) {
+            if (this.isPlaying()) {
                 pause();
             }
         } else {
-            if (!mMediaPlayer.isPlaying()) {
+            if (!emExoPlayer.isPlaying()) {
                 start();
             }
         }
@@ -218,7 +218,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     public void setMutedModifier(final boolean muted) {
         mMuted = muted;
 
-        if (!mMediaPlayerValid) {
+        if (!emExoPlayerValid) {
             return;
         }
 
@@ -237,7 +237,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     public void setRateModifier(final float rate) {
         mRate = rate;
 
-        if (mMediaPlayerValid) {
+        if (emExoPlayerValid) {
             // TODO: Implement this.
             Log.e(ReactVideoViewManager.REACT_CLASS, "Setting playback rate is not yet supported on Android");
         }
@@ -245,10 +245,11 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     public void applyModifiers() {
         setResizeModeModifier(mResizeMode);
-        setRepeatModifier(mRepeat);
+        // TODO: no looping support from ExoPlayer yet, so do it manually at complete event
+        //setRepeatModifier(mRepeat);
         setPausedModifier(mPaused);
         setMutedModifier(mMuted);
-//        setRateModifier(mRate);
+        //setRateModifier(mRate);
     }
 
     public void setPlayInBackground(final boolean playInBackground) {
@@ -256,8 +257,8 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     @Override
-    public void onPrepared(MediaPlayer mp) {
-        mMediaPlayerValid = true;
+    public void onPrepared(EMExoPlayer mp) {
+        emExoPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
         WritableMap naturalSize = Arguments.createMap();
@@ -286,7 +287,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     @Override
-    public boolean onError(MediaPlayer mp, int what, int extra) {
+    public boolean onError(EMExoPlayer mp, int what, int extra) {
         WritableMap error = Arguments.createMap();
         error.putInt(EVENT_PROP_WHAT, what);
         error.putInt(EVENT_PROP_EXTRA, extra);
@@ -297,14 +298,14 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     @Override
-    public void onBufferingUpdate(MediaPlayer mp, int percent) {
+    public void onBufferingUpdate(EMExoPlayer mp, int percent) {
         mVideoBufferedDuration = (int) Math.round((double) (mVideoDuration * percent) / 100.0);
     }
 
     @Override
     public void seekTo(int msec) {
 
-        if (mMediaPlayerValid) {
+        if (emExoPlayerValid) {
             WritableMap event = Arguments.createMap();
             event.putDouble(EVENT_PROP_CURRENT_TIME, getCurrentPosition() / 1000.0);
             event.putDouble(EVENT_PROP_SEEK_TIME, msec / 1000.0);
@@ -315,14 +316,14 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     @Override
-    public void onCompletion(MediaPlayer mp) {
-        mMediaPlayerValid = false;
+    public void onCompletion(EMExoPlayer mp) {
+        emExoPlayerValid = false;
         mEventEmitter.receiveEvent(getId(), Events.EVENT_END.toString(), null);
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        mMediaPlayerValid = false;
+        emExoPlayerValid = false;
         super.onDetachedFromWindow();
     }
 
@@ -334,12 +335,12 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void onHostPause() {
-        if (mMediaPlayer != null && !mPlayInBackground) {
-            mMediaPlayer.pause();
+        if (emExoPlayer != null && !mPlayInBackground) {
+            emExoPlayer.pause();
         }
     }
 
-    @Override 
+    @Override
     public void onHostResume() {
     }
 

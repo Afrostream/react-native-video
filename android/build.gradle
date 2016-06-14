@@ -16,6 +16,7 @@ android {
 }
 
 dependencies {
-    compile 'com.facebook.react:react-native:0.19.+'
+    compile 'com.facebook.react:react-native:+'
+    compile 'com.devbrackets.android:exomedia:3.0.0-preview3'
     compile 'com.yqritc:android-scalablevideoview:1.0.1'
 }
