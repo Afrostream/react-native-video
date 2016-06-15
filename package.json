@@ -15,6 +15,7 @@
     "android/src/main/java/com/brentvatne/react/ReactVideoView.java",
     "android/src/main/java/com/brentvatne/react/DashDRMRenderBuilder.java",
     "android/src/main/java/com/brentvatne/react/WidevineTestMediaDrmCallback.java",
+    "android/src/main/java/com/brentvatne/react/WidevineDrm.java",
     "RCTVideo.xcodeproj",
     "RCTVideo.h",
     "RCTVideo.m",
