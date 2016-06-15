@@ -27,36 +27,63 @@ import android.util.Log;
 import java.io.IOException;
 import java.util.UUID;
 
+import android.drm.DrmErrorEvent;
+import android.drm.DrmEvent;
+import android.drm.DrmInfo;
+import android.drm.DrmInfoEvent;
+import android.drm.DrmInfoRequest;
+import android.drm.DrmManagerClient;
+import android.drm.DrmStore;
+
 /**
  * A {@link MediaDrmCallback} for Widevine test content.
  */
 @TargetApi(18)
 public class WidevineTestMediaDrmCallback implements MediaDrmCallback {
 
-    private static final String WIDEVINE_GTS_DEFAULT_BASE_URI =
-            "https://proxy.uat.widevine.com/proxy";
+    private final DrmInfoRequest rightsAcquisitionInfo;
+    private final DrmManagerClient mDrmManager;
+    private final String assetUri;
+    private final String userData;
 
-    private final String defaultUri;
+    /**
+     * Drm Manager Configuration Methods
+     */
 
-    public WidevineTestMediaDrmCallback(String contentId, String provider) {
-        String params = "?video_id=" + contentId + "&provider=" + provider;
-        defaultUri = WIDEVINE_GTS_DEFAULT_BASE_URI + params;
-        Log.d("defaultUri", defaultUri);
+    public static class Settings {
+        public static String WIDEVINE_MIME_TYPE = "video/wvm";
+        public static String DRM_SERVER_URI = "https://lic.staging.drmtoday.com/license-proxy-widevine/";
+        public static String DEVICE_ID = "device12345"; // use a unique device
+        // ID
+        public static String PORTAL_NAME = "castlabs";
+    }
+
+    public WidevineTestMediaDrmCallback(String url, String user) {
+        assetUri = url;
+        userData = user;
+        Log.d("defaultUri", assetUri);
+        // mContext = context;
+        mDrmManager = new DrmManagerClient();
+        rightsAcquisitionInfo = new DrmInfoRequest(DrmInfoRequest.TYPE_RIGHTS_ACQUISITION_INFO, Settings.WIDEVINE_MIME_TYPE);
+        rightsAcquisitionInfo.put("WVDRMServerKey", Settings.DRM_SERVER_URI);
+        rightsAcquisitionInfo.put("WVDeviceIDKey", Settings.DEVICE_ID);
+        rightsAcquisitionInfo.put("WVPortalKey", Settings.PORTAL_NAME);
+        rightsAcquisitionInfo.put("WVAssetURIKey", assetUri);
+        rightsAcquisitionInfo.put("WVCAUserDataKey", userData);
     }
 
     @Override
     public byte[] executeProvisionRequest(UUID uuid, ProvisionRequest request) throws IOException {
-        String url = request.getDefaultUrl() + "&signedRequest=" + new String(request.getData());
-        return Util.executePost(url, null, null);
+        DrmInfoRequest request = new DrmInfoRequest(
+                DrmInfoRequest.TYPE_REGISTRATION_INFO,
+                Settings.WIDEVINE_MIME_TYPE);
+        request.put("WVPortalKey", Settings.PORTAL_NAME);
+        return mDrmManager.acquireDrmInfo(request);
     }
 
     @Override
     public byte[] executeKeyRequest(UUID uuid, KeyRequest request) throws IOException {
-        String url = request.getDefaultUrl();
-        if (TextUtils.isEmpty(url)) {
-            url = defaultUri;
-        }
-        return Util.executePost(url, request.getData(), null);
+        return mDrmManager.acquireRights(getDrmInfoRequest(assetUri));
     }
 
 }

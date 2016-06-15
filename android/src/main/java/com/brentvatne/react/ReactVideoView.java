@@ -211,7 +211,7 @@ public class ReactVideoView extends EMVideoView implements
                 return new HlsRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString());
             case DASH:
                 return new DashDRMRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString(),
-                        new WidevineTestMediaDrmCallback("", "widevine_test"));
+                        new WidevineTestMediaDrmCallback(uri.toString(), "eyJ1c2VySWQiOiIxMjM0NSIsInNlc3Npb25JZCI6ImV3b2dJQ0p3Y205bWFXeGxJaUE2SUhzS0lDQWdJQ0p3ZFhKamFHRnpaU0lnT2lCN0lIMEtJQ0I5TEFvZ0lDSnZkWFJ3ZFhSUWNtOTBaV04wYVc5dUlpQTZJSHNLSUNBZ0lDSmthV2RwZEdGc0lpQTZJR1poYkhObExBb2dJQ0FnSW1GdVlXeHZaM1ZsSWlBNklHWmhiSE5sTEFvZ0lDQWdJbVZ1Wm05eVkyVWlJRG9nWm1Gc2MyVUtJQ0I5TEFvZ0lDSnpkRzl5WlV4cFkyVnVjMlVpSURvZ1ptRnNjMlVLZlFvSyIsIm1lcmNoYW50IjoiY2FibGVsYWJzIn0K"));
             case SMOOTH_STREAM:
                 return new SmoothStreamRenderBuilder(getContext().getApplicationContext(), getUserAgent(), uri.toString());
             default:
